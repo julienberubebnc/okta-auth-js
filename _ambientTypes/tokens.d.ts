@@ -1,4 +1,3 @@
-/* eslint-disable camelcase */
 declare namespace OktaAuth {
   interface JWTObject {
     header: object;
