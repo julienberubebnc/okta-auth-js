@@ -4,7 +4,26 @@ const PROTO = window.location.protocol;
 const REDIRECT_URI = `${PROTO}//${HOST}${CALLBACK_PATH}`;
 const POST_LOGOUT_REDIRECT_URI = `${PROTO}//${HOST}`;
 
-function getDefaultConfig() {
+interface Config {
+  redirectUri: string;
+  postLogoutRedirectUri: string;
+  issuer: string;
+  clientId: string;
+  responseType: string[];
+  responseMode?: string;
+  scopes: string[];
+  _defaultScopes: boolean;
+  pkce: boolean;
+  cookies: {
+    secure: boolean;
+    sameSite?: string;
+  },
+  tokenManager?: {
+    storage: string;
+  }
+}
+
+function getDefaultConfig():Config {
   const ISSUER = process.env.ISSUER;
   const CLIENT_ID = process.env.CLIENT_ID;
   
@@ -24,7 +43,7 @@ function getDefaultConfig() {
 }
 
 // eslint-disable-next-line complexity
-function getConfigFromUrl() {
+function getConfigFromUrl():Config {
   const url = new URL(window.location.href);
   const issuer = url.searchParams.get('issuer');
   const redirectUri = url.searchParams.get('redirectUri') || REDIRECT_URI;
@@ -59,11 +78,11 @@ function getConfigFromUrl() {
   };
 }
 
-function saveConfigToStorage(config) {
-  const configCopy = {};
+function saveConfigToStorage(config:Config) {
+  const configCopy:any = {};
   Object.keys(config).forEach(key => {
-    if (typeof config[key] !== 'function') {
-      configCopy[key] = config[key];
+    if (typeof (config as any)[key] !== 'function') {
+      configCopy[key] = (config as any)[key];
     }
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(configCopy));
@@ -78,16 +97,16 @@ function clearStorage() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-function flattenConfig(config) {
-  let flat = {};
+function flattenConfig(config:Config) {
+  let flat:any = {};
   Object.assign(flat, config.tokenManager);
   Object.assign(flat, config.cookies);
   Object.keys(config).forEach(key => {
     if (key !== 'tokenManager' && key !== 'cookies') {
-      flat[key] = config[key];
+      flat[key] = (config as any)[key];
     }
   });
   return flat;
 }
 
-export { getDefaultConfig, getConfigFromUrl, saveConfigToStorage, getConfigFromStorage, clearStorage, flattenConfig };
+export { Config, getDefaultConfig, getConfigFromUrl, saveConfigToStorage, getConfigFromStorage, clearStorage, flattenConfig };

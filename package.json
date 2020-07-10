@@ -109,7 +109,7 @@
     "lodash": "4.17.11",
     "promise.allsettled": "^1.0.1",
     "shelljs": "0.8.3",
-    "typescript": "^3.9.2",
+    "typescript": "^3.9.6",
     "webpack": "^3.0.0"
   },
   "jest-junit": {

@@ -13,17 +13,17 @@
 /* eslint-disable no-console */
 /* eslint-disable max-len */
 import OktaAuth from '@okta/okta-auth-js';
-import { saveConfigToStorage, flattenConfig } from './config';
+import { saveConfigToStorage, flattenConfig, Config } from './config';
 import { MOUNT_PATH } from './constants';
 import { htmlString, toQueryParams } from './util';
 import { Form, updateForm } from './form';
 import { tokensHTML } from './tokens';
 
-function homeLink(app) {
+function homeLink(app:TestApp) {
   return `<a id="return-home" href="${app.originalUrl}">Return Home</a>`;
 }
 
-function logoutLink(app) {
+function logoutLink(app:TestApp) {
   return `
   <a id="logout-redirect" href="${app.originalUrl}" onclick="logoutRedirect(event)">Logout (and redirect here)</a><br/>
   <a id="logout-xhr" href="${app.originalUrl}" onclick="logoutXHR(event)">Logout (XHR + reload)</a><br/>
@@ -48,14 +48,14 @@ const Layout = `
   </div>
 `;
 
-function makeClickHandler(fn) {
-  return function(event) {
+function makeClickHandler(fn:() => void) {
+  return function(event:Event) {
     event && event.preventDefault(); // prevent navigation / page reload
     return fn();
   };
 }
 
-function bindFunctions(testApp, window) {
+function bindFunctions(testApp:TestApp, window:Window) {
   var boundFunctions = {
     loginRedirect: testApp.loginRedirect.bind(testApp, {}),
     loginPopup: testApp.loginPopup.bind(testApp, {}),
@@ -74,22 +74,25 @@ function bindFunctions(testApp, window) {
     testConcurrentLogin: testApp.testConcurrentLogin.bind(testApp)
   };
   Object.keys(boundFunctions).forEach(functionName => {
-    window[functionName] = makeClickHandler(boundFunctions[functionName]);
+    (window as any)[functionName] = makeClickHandler((boundFunctions as any)[functionName]);
   });
 }
 
-function TestApp(config) {
-  this.config = config;
-  Object.assign(this.config, {
-    onSessionExpired: this._onSessionExpired.bind(this)
-  });
-}
+class TestApp {
+  config:Config;
+  originalUrl?:string;
+  rootElem?:Element;
+  contentElem?:Element;
+  oktaAuth?:OktaAuth;
+  constructor(config:Config) {
+    this.config = config;
+    Object.assign(this.config, {
+      onSessionExpired: this._onSessionExpired.bind(this)
+    });
+  }
 
-export default TestApp;
-
-Object.assign(TestApp.prototype, {
   // Mount into the DOM
-  mount: function(window, rootElem) {
+  mount(window:Window, rootElem:Element) {
     this.originalUrl = MOUNT_PATH + toQueryParams(flattenConfig(this.config));
     this.rootElem = rootElem;
     this.rootElem.innerHTML = Layout;
@@ -97,7 +100,8 @@ Object.assign(TestApp.prototype, {
     document.getElementById('config-dump').innerHTML = this.configHTML();
     this.contentElem = document.getElementById('page-content');
     bindFunctions(this, window);
-  },
+  }
+
   getSDKInstance() {
     return Promise.resolve()
       .then(() => {
@@ -107,25 +111,30 @@ Object.assign(TestApp.prototype, {
         }));
         this.oktaAuth.tokenManager.on('error', this._onTokenError.bind(this));
       });
-  },
-  _setContent: function(content) {
+  }
+
+  _setContent(content:string) {
     this.contentElem.innerHTML = `
       <div>${content}</div>
     `;
-  },
-  _afterRender: function(extraClass) {
+  }
+
+  _afterRender(extraClass?:string) {
     this.rootElem.classList.add('rendered');
     if (extraClass) {
       this.rootElem.classList.add(extraClass);
     }
-  },
-  _onTokenError: function(error) {
+  }
+
+  _onTokenError(error:string) {
     document.getElementById('token-error').innerText = error;
-  },
-  _onSessionExpired: function() {
+  }
+
+  _onSessionExpired() {
     document.getElementById('session-expired').innerText = 'SESSION EXPIRED';
-  },
-  bootstrapCallback: async function() {
+  }
+
+  async bootstrapCallback() {
     const content = `
       <a id="handle-callback" href="/" onclick="handleCallback(event)">Handle callback (Continue Login)</a>
       <hr/>
@@ -134,13 +143,15 @@ Object.assign(TestApp.prototype, {
     return this.getSDKInstance()
       .then(() => this._setContent(content))
       .then(() => this._afterRender('callback'));
-  },
-  bootstrapHome: async function() {
+  }
+
+  async bootstrapHome() {
     // Default home page
     return this.getSDKInstance()
       .then(() => this.render());
-  },
-  render: function() {
+  }
+
+  render() {
     this.getTokens()
     .catch((e) => {
       this.renderError(e);
@@ -150,7 +161,7 @@ Object.assign(TestApp.prototype, {
     .then(content => this._setContent(content))
     .then(() => {
       // Add a special highlight on links when they are clicked
-      let links = Array.prototype.slice.call(document.getElementsByTagName('a'));
+      let links = Array.prototype.slice.call(document.getElementsByTagName('a')) as Element[];
       links.forEach(link => {
         link.addEventListener('click', function() {
           this.classList.add('clicked');
@@ -158,8 +169,9 @@ Object.assign(TestApp.prototype, {
       });
       this._afterRender();
     });
-  },
-  renderError: function(e) {
+  }
+
+  renderError(e) {
     const xhrError = e && e.xhr ? (e.xhr.message || 'Network request failed') : '';
     this._setContent(`
       <div id="error" style="color: red">${e.toString()}</div>
@@ -169,10 +181,11 @@ Object.assign(TestApp.prototype, {
       ${logoutLink(this)}
     `);
     this._afterRender('with-error');
-  },
-  loginDirect: async function() {
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+  }
+
+  async loginDirect() {
+    const username = (document.getElementById('username') as HTMLInputElement).value;
+    const password = (document.getElementById('password') as HTMLInputElement).value;
     return this.oktaAuth.signIn({username, password})
     .then(res => {
       if (res.status === 'SUCCESS') {
@@ -187,8 +200,9 @@ Object.assign(TestApp.prototype, {
       this.renderError(e);
       throw e;
     });
-  },
-  loginRedirect: async function(options) {
+  }
+
+  async loginRedirect(options) {
     saveConfigToStorage(this.config);
     options = Object.assign({}, {
       responseType: this.config.responseType,
@@ -199,8 +213,9 @@ Object.assign(TestApp.prototype, {
         this.renderError(e);
         throw e;
       });
-  },
-  loginPopup: async function(options) {
+  }
+
+  async loginPopup(options) {
     options = Object.assign({}, {
       responseType: this.config.responseType,
       scopes: this.config._defaultScopes ? [] : this.config.scopes,
@@ -210,8 +225,9 @@ Object.assign(TestApp.prototype, {
       this.saveTokens(res.tokens);
       this.render();
     });
-  },
-  getToken: async function(options) {
+  }
+
+  async getToken(options) {
     options = Object.assign({}, {
       responseType: this.config.responseType,
       scopes: this.config._defaultScopes ? [] : this.config.scopes,
@@ -221,29 +237,34 @@ Object.assign(TestApp.prototype, {
       this.saveTokens(res.tokens);
       this.render();
     });
-  },
-  refreshSession: async function() {
+  }
+
+  async refreshSession() {
     return this.oktaAuth.session.refresh();
-  },
-  revokeToken: async function() {
+  }
+
+  async revokeToken() {
     return this.oktaAuth.revokeAccessToken()
     .then(() => {
       document.getElementById('token-msg').innerHTML = 'access token revoked';
     });
-  },
-  renewToken: async function() {
+  }
+
+  async renewToken() {
     return this.oktaAuth.tokenManager.renew('accessToken')
       .then(() => {
         this.render();
       });
-  },
-  logoutRedirect: function() {
+  }
+
+  logoutRedirect() {
     this.oktaAuth.signOut()
       .catch(e => {
         console.error('Error during signout & redirect: ', e);
       });
-  },
-  logoutXHR: async function() {
+  }
+
+  async logoutXHR() {
     await this.oktaAuth.revokeAccessToken();
     this.oktaAuth.closeSession()
       .catch(e => {
@@ -252,13 +273,15 @@ Object.assign(TestApp.prototype, {
       .then(() => {
         window.location.reload();
       });
-  },
-  logoutApp: async function() {
+  }
+
+  async logoutApp() {
     await this.oktaAuth.revokeAccessToken();
     this.oktaAuth.tokenManager.clear();
     window.location.reload();
-  },
-  handleCallback: async function() {
+  }
+
+  async handleCallback() {
     return this.getTokensFromUrl()
       .catch(e => {
         this.renderError(e);
@@ -269,14 +292,16 @@ Object.assign(TestApp.prototype, {
       })
       .then(content => this._setContent(content))
       .then(() => this._afterRender('callback-handled'));
-  },
-  getTokensFromUrl: async function() {
+  }
+
+  async getTokensFromUrl() {
     // parseFromUrl() Will parse the authorization code from the URL fragment and exchange it for tokens
     const res = await this.oktaAuth.token.parseFromUrl();
     this.saveTokens(res.tokens);
     return res;
-  },
-  saveTokens: function(tokens) {
+  }
+
+  saveTokens(tokens) {
     const { idToken, accessToken } = tokens;
     if (idToken) {
       this.oktaAuth.tokenManager.add('idToken', idToken);
@@ -284,16 +309,19 @@ Object.assign(TestApp.prototype, {
     if (accessToken) {
       this.oktaAuth.tokenManager.add('accessToken', accessToken);
     }
-  },
-  getTokens: async function() {
+  }
+
+  async getTokens() {
     const accessToken = await this.oktaAuth.tokenManager.get('accessToken');
     const idToken = await this.oktaAuth.tokenManager.get('idToken');
     return { accessToken, idToken };
-  },
-  clearTokens: function() {
+  }
+
+  clearTokens() {
     this.oktaAuth.tokenManager.clear();
-  },
-  getUserInfo: async function() {
+  }
+
+  async getUserInfo() {
     const { accessToken, idToken } = await this.getTokens();
     if (accessToken && idToken) {
       return this.oktaAuth.token.getUserInfo(accessToken)
@@ -307,8 +335,9 @@ Object.assign(TestApp.prototype, {
     } else {
       this.renderError(new Error('Missing tokens'));
     }
-  },
-  testConcurrentGetToken: async function() {
+  }
+
+  async testConcurrentGetToken() {
     // Call getToken() but do not await the result
     var p1 = this.getToken().catch(error => {
       console.error('Saw error on the first request', error);
@@ -325,8 +354,9 @@ Object.assign(TestApp.prototype, {
       .then(() => {
         document.getElementById('token-msg').innerHTML = 'concurrent test passed';
       });
-  },
-  testConcurrentLogin: async function() {
+  }
+
+  async testConcurrentLogin() {
     // Call login but do not await the result
     var p1 = this.loginPopup().catch(error => {
       console.error('Saw error on the first request', error);
@@ -343,15 +373,17 @@ Object.assign(TestApp.prototype, {
       .then(() => {
         document.getElementById('token-msg').innerHTML = 'concurrent test passed';
       });
-  },
+  }
+
   configHTML() {
     const config = htmlString(this.config);
     return `
       <h2>Config</h2>
       ${ config }
     `;
-  },
-  appHTML: function(props) {
+  }
+
+  appHTML(props) {
     const { idToken, accessToken } = props || {};
     if (idToken || accessToken) {
       // Authenticated user home page
@@ -412,9 +444,9 @@ Object.assign(TestApp.prototype, {
       <input name="password" id="password" placeholder="password" type="password"/>
       <a href="/" id="login-direct" onclick="loginDirect(event)">Login DIRECT</a>
       `;
-  },
+  }
 
-  callbackHTML: function(res) {
+  callbackHTML(res) {
     const tokensReceived = res.tokens ? Object.keys(res.tokens): [];
     const success = res.tokens && tokensReceived.length;
     const errorMessage = success ? '' :  'Tokens not returned. Check error console for more details';
@@ -433,4 +465,6 @@ Object.assign(TestApp.prototype, {
     `;
     return content;
   }
-});
+}
+
+export default TestApp;

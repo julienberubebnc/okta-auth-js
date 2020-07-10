@@ -2,13 +2,22 @@
 
 import '@okta/okta-auth-js/polyfill';
 
-import Cookies from 'js-cookie';
+import * as Cookies from 'js-cookie';
 
 import TestApp from './testApp';
-import { getDefaultConfig, getConfigFromUrl, getConfigFromStorage, clearStorage } from './config';
+import { Config, getDefaultConfig, getConfigFromUrl, getConfigFromStorage, clearStorage } from './config';
 
-let app;
-let config;
+declare global {
+  interface Window {
+    _testApp:TestApp;
+    _cookies:any;
+    bootstrapLanding: () => void;
+    bootstrapCallback: () => void;
+  }
+}
+
+let app:TestApp;
+let config:Config;
 const rootElem = document.getElementById('root');
 
 function mount() {
