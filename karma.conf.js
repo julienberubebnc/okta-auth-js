@@ -31,6 +31,7 @@ var webpackConf =  _.extend({}, _.cloneDeep(commonConfig), {
         options: {
           presets: ['@babel/preset-env'],
           plugins: [
+            '@babel/plugin-proposal-class-properties',
             '@babel/plugin-transform-runtime',
             'mockable-imports'
           ],
